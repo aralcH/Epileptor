@@ -1,0 +1,150 @@
+This code reproduces the signal measured in the brain during an epileptic seizure, as described in the article:
+
+El Houssaini, C. Bernard y V. K. Jirsa (2020). 
+The Epileptor Model: A Systematic Mathematical Analysis Linked to the Dynamics of Seizures, Refractory Status
+Epilepticus, and Depolarization Block. eNeuro 7(2). 
+
+INPUT: the code needs a conectivity matrix and initial values of x0, x1, x2, y1, y2, z to work. Additionally, i1 and i2 can be changed easily. 
+	Other parameters of the system like the constants in the equations are taken as fixed values (with the values of the paper)
+	and would have to be changed in the differential equations. They might have been operated together to be reduced to a number 
+	to simplify the code. 
+	The parameter m is not included in this code but can be easily added. 
+	The parameters for the integration and printing of the results like the step h, number of stemps and sampling frequency can also be 
+	easily modified.
+
+OUTPUT: evolving values in time of each varaible in the differential equation system (x1, x2, y1, y2, z) and Psi (-x1+x2).
+	files foratted to be read as heatmaps in gnuplot.
+
+		
+		1. VARIABLES.
+		2. RANDOM NUMBERS GENERATION
+		3. DESCRIPTION
+		4. ONE-NODE VERSION
+		5. INTERPRETATION OF THE RESULTS
+		6. UNITS
+
+-----------------------------------------------------
+VARIABLES
+
+Iterating indices
+	i : auxiliary iterarion index 
+	k : iteration index for the time integration
+	n : iteration index for the integration of g
+	m : iteration index for the network indices
+
+
+Integration parameters
+	Nsteps : number of integration steps for the epileptors
+	N : number of past elements kept for the integration of g
+	xn[M] : vector of pointers, each index pointing to a vector of N elements. 
+	h : integration step
+	raizh : square root of h
+
+Model equations and parameters
+	M : number of nodes in the network
+	x1[M][2], x2[M][2], y1[M][2], y2[M][2], z[M][2] : variables holding the current value of the function 
+							in the index [1] and the previous value in the index [0].
+	x0[M] : parameter x0 for each node
+	K[M][M] : conectome matrix
+	i1, i2 : parameters i1 and i2 in the equations
+	g : numerical value of the g integral factor
+	t0 : tau0 factor in the equations
+	S : auxiliary variable for a summatory value
+
+	desv : standard deviation for the gaussian noise
+
+Files
+	Fsamp : sampling frequency for writing in files
+
+	x1_i : initial value of x1
+	x2_i : initial value of x2
+	y1_i : initial value of y1
+	y2_i : initial value of y2
+	z_i : initial value of z
+	x0_i : initial value of x0
+
+	conectoma : MxM values, values of the connectivity matrix of the network
+
+	Psi : time series of -x1 + x2
+	Psi1 : time series of x1
+	Psi2 : time series of x2
+	y_1 : time series of y1
+	y_2 : time series of y2
+	z_z : time series of z
+	X1 : heatmap of x1
+	X2 : heatmap of x2
+	Y1 : heatmap of y1
+	Y2 : heatmap of y2
+	Z : heatmap of z
+
+-------------------------------------------------------
+RANDOM NUMBERS GENERATION
+
+The Pseudo Random Number Generator used was mt19937 ( in the <random> header), with uses 
+the Mersenne twister algorithm. For the seed, the <chrono> library has been used with the steady_clock,
+an ever increasing clock, so it will never give the same result when now().time_since_epoch().count() is 
+executed (the epoch is a time of reference, that code counts the ticks from that epoch until now).
+
+The random distribution used for the noise is normal_distribution<>. The distribution is centred around 0.0 with 
+a standard deviation desv. Each time the function gauss() is called, it generates a new random number with 
+a random seed e generated with the previous generator.  
+
+-------------------------------------------------------
+DESCRIPTION
+
+The first steps in the code are the declaration of variables and setting the random number generator and distribution,
+assigning the fixed values to several of the program features. Next, the files that will contain the results are created/opened and 
+the files with the initial values are opened. 
+The variables are assigned the initial values. Since vectors with dynamic sizes are not so convenient in C++, the xn vectors are initialized
+with the initial value of their corresponding x1 in all their elements. With a sampling frequency of 100 and 5000 elements per vector, this
+only affects to the first 50 points of the printed results. That is a very assumable cost, since the network takes longer to get out of the 
+transitory phase.
+
+Once the initial values are assigned, the numerical integration takes place.
+The integration loop (index k) contains an if conditional followed by the Epileptor equations. The conditional writes the time in the time series
+files if the number of iteration matches the sampling frequency. Next, the integration is performed for every Epileptor, going over every node 
+with a loop over the m index.  
+The algorithm in each Epileptor loop is as it follows:
+
+1. The value of g is calculated. Integrating over t using the same integration step h and the values of xn.
+2. Integration of the equations. The equations may have been operated before coding for optimization.
+3. Actualization of the xn vector. Effectively removing the fisrt element and adding the current value at the end, so it keeps being the last N elements.
+4. Writing the corresponding values in the files before moving to the next node.
+
+Once the m-index loop is completed and so the whole network has been actualized, the necessary linebreaks for correct file formatting are added to each file 
+and the initial values are actualized for the next integration step. 
+With this, the simulation is completed once all the integration steps take place.
+
+   **************** DELETING THE POINTER VALUES ****************
+   *                                                           *             
+   *     EXTREMELY IMPORTANT to delete all the pointer         *
+   *               the end of the program                      *
+   *                                                           *
+   *************************************************************
+
+-------------------------------------------------------------------------------
+ONE-NODE VERSION
+
+The single Epileptor simulation follows the same structure but its implementation is simpler.
+There is no need to use pointers for the vector xn or read the initial values from files, so xn and the the initial values are taken care of in the 
+initialization of values. This allows for the state of the node to be easily chosen. There is also no transitory phase because there is no interaction. 
+There is one extra file in this program, "tri" which holds the data for representing the tridimensional figure that appears in the paper of reference, 
+that is, it has the variables to represent the atractor. 
+
+The principal use of this version is to familiarize oneself with the behaviour of the Epileptor, compare the bahaviour of an isolated node with that of 
+a similar node under the influence of the network and to visualize the attractor. 
+
+-------------------------------------------------------------------------------
+INTERPRETATION OF THE RESULTS
+
+If random initial value files are used, it needs to be taken into account that the initial state is not necessarily one that is compatible 
+with how the network interacts with itself. In this case, there is a transitory phase of variable duration that takes the system from that 
+initial state to one determined by the network interaction. This phase can be easily identified viasually, since the system as a whole shows 
+different behaviours. I would personally only consider valid the behaviour past the moment in which the last node to change abandons the 
+initial state. Of course, this must be applied sensibly at one's discretion since the casuistry is very varied. It may very well happen that 
+a node stays in the state it started or teh network even reiforces it. 
+If the initial states are a know state of the network, this transitory phase should not be an issue. 
+
+--------------------------------------------------------------------------------
+UNITS
+
